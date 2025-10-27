@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+
 import gc
 import os
 import sys
@@ -45,9 +46,26 @@ from paddleformers.transformers.configuration_utils import LlmMetaConfig
 from paddleformers.trl import DataConfig, ModelConfig, SFTConfig, SFTTrainer
 from paddleformers.trl.llm_utils import compute_metrics, get_lora_target_modules
 from paddleformers.utils.log import logger
+import logging
 
-# Fine-tune Environment Variables to support sharding stage1 overlap optimization.
-os.environ["USE_CASUAL_MASK"] = "False"
+if not paddle.distributed.is_initialized() or paddle.distributed.get_rank() == 0:
+    # 1. 定义日志文件路径和格式
+    log_file_path = "training.log"
+    # 文件日志不需要颜色，所以用标准 Formatter
+    file_formatter = logging.Formatter("[%(asctime)s] [%(levelname)8s] - %(message)s")
+
+    # 2. 创建一个 FileHandler
+    file_handler = logging.FileHandler(log_file_path, mode="w", encoding="utf-8")
+    file_handler.setLevel(logging.INFO)  # 设置文件记录的级别
+    file_handler.setFormatter(file_formatter)
+
+    # 3. 获取框架的 logger 实例，并添加我们新的 handler
+    # logger.logger 才是真正的 logging.Logger 对象
+    from paddleformers.utils.log import logger
+
+    logger.logger.addHandler(file_handler)
+
+    logger.info("✅ File logger configured. Output will be saved to training.log")
 
 
 def main():
@@ -188,7 +206,11 @@ def main():
     if tokenizer.chat_template is not None:
         data_args.eval_with_do_generation = False
 
-    if isinstance(tokenizer, LlamaTokenizer) or isinstance(tokenizer, Llama3Tokenizer):
+    if (
+        isinstance(tokenizer, LlamaTokenizer)
+        or isinstance(tokenizer, Llama3Tokenizer)
+        or tokenizer.pad_token_id is None
+    ):
         tokenizer.pad_token_id = tokenizer.eos_token_id
 
     dataset_config = {

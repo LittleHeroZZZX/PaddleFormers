@@ -69,6 +69,36 @@ flash_mask_support_list = [
     Qwen3MoeForCausalLM,
     Qwen3MoeForCausalLMPipe,
 ]
+import logging
+
+
+def hook_log(model_args, config_path: str):
+    from pathlib import Path
+    import shutil
+
+    output_dir = Path(model_args.output_dir)
+    shutil.rmtree(output_dir, ignore_errors=True)
+    if not paddle.distributed.is_initialized() or paddle.distributed.get_rank() == 0:
+        # 1. 定义日志文件路径和格式
+        assert config_path.startswith("config/") and config_path.endswith(".yaml")
+        log_file_path = "results/" + config_path[7:].replace(".yaml", ".log")
+        # 文件日志不需要颜色，所以用标准 Formatter
+        file_formatter = logging.Formatter(
+            "[%(asctime)s] [%(levelname)8s] - %(message)s"
+        )
+
+        # 2. 创建一个 FileHandler
+        file_handler = logging.FileHandler(log_file_path, mode="w", encoding="utf-8")
+        file_handler.setLevel(logging.INFO)  # 设置文件记录的级别
+        file_handler.setFormatter(file_formatter)
+
+        # 3. 获取框架的 logger 实例，并添加我们新的 handler
+        # logger.logger 才是真正的 logging.Logger 对象
+        from paddleformers.utils.log import logger
+
+        logger.logger.addHandler(file_handler)
+
+        logger.info("✅ File logger configured. Output will be saved to training.log")
 
 
 def main():
@@ -80,7 +110,7 @@ def main():
         model_args, data_args, training_args, dpo_config = parser.parse_yaml_file_and_cmd_lines()
     else:
         model_args, data_args, training_args, dpo_config = parser.parse_args_into_dataclasses()
-
+    hook_log(training_args, sys.argv[1])
     paddle.set_device(training_args.device)
     set_seed(training_args.seed)
 

@@ -11,7 +11,7 @@ packing: false
 mix_strategy: concat
 
 ### model
-model_name_or_path: Qwen/Qwen3-0.6B-Base
+model_name_or_path: LLM-Research/Llama-3.2-1B-Instruct
 attn_impl: flashmask
 use_fused_head_and_loss_fn: True
 loss_subbatch_sequence_length: 8192
